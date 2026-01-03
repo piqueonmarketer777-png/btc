@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocConvert Pro | Word to PDF Converter</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Mammoth.js for DOCX parsing -->
+    <script src="https://unpkg.com/mammoth@1.5.1/mammoth.browser.min.js"></script>
+    <!-- html2pdf.js for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        /* Custom animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        .animate-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+        
+        /* Custom scrollbar */
+        .preview-content::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .preview-content::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        
+        .preview-content::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        
+        .preview-content::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        
+        /* Document preview styling */
+        .doc-preview h1, .doc-preview h2, .doc-preview h3 {
+            font-weight: bold;
+            margin-top: 1em;
+            margin-bottom: 0.5em;
+        }
+        
+        .doc-preview h1 { font-size: 1.875rem; }
+        .doc-preview h2 { font-size: 1.5rem; }
+        .doc-preview h3 { font-size: 1.25rem; }
+        
+        .doc-preview p {
+            margin-bottom: 1em;
+            line-height: 1.6;
+        }
+        
+        .doc-preview ul, .doc-preview ol {
+            margin-left: 1.5em;
+            margin-bottom: 1em;
+        }
+        
+        .doc-preview table {
+            border-collapse: collapse;
+            margin-bottom: 1em;
+            width: 100%;
+        }
+        
+        .doc-preview table, .doc-preview th, .doc-preview td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+        
+        .doc-preview th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        
+        /* File upload zone styling */
+        .upload-zone.dragover {
+            border-color: #4f46e5;
+            background-color: rgba(79, 70, 229, 0.05);
+        }
+        
+        /* Print styles for PDF */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <!-- Header -->
+        <header class="text-center mb-10 animate-fade-in">
+            <div class="flex items-center justify-center mb-4">
+                <div class="bg-gradient-to-r from-blue-500 to-purple-600 p-3 rounded-2xl shadow-lg">
+                    <i class="fas fa-file-pdf text-white text-3xl"></i>
+                </div>
+            </div>
+            <h1 class="text-4xl font-bold text-gray-800 mb-3">DocConvert Pro</h1>
+            <p class="text-gray-600 text-lg max-w-2xl mx-auto">
+                Convert your Word documents (.docx) to professional PDF files with perfect formatting.
+            </p>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Left Column: Upload & Controls -->
+            <div class="space-y-8">
+                <!-- Upload Card -->
+                <div class="bg-white rounded-2xl shadow-xl p-6 animate-fade-in">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+                        <i class="fas fa-cloud-upload-alt text-blue-500 mr-3"></i>
+                        Upload Word Document
+                    </h2>
+                    
+                    <!-- File Upload Zone -->
+                    <div 
+                        id="uploadZone" 
+                        class="upload-zone border-3 border-dashed border-gray-300 rounded-2xl p-10 text-center transition-all duration-300 cursor-pointer hover:border-blue-400 hover:bg-blue-50 mb-6"
+                    >
+                        <div class="flex flex-col items-center">
+                            <div class="bg-gradient-to-r from-blue-100 to-purple-100 p-5 rounded-full mb-5">
+                                <i class="fas fa-file-word text-blue-600 text-5xl"></i>
+                            </div>
+                            <h3 class="text-xl font-semibold text-gray-700 mb-2">Drag & Drop your .docx file</h3>
+                            <p class="text-gray-500 mb-6">or click to browse your computer</p>
+                            <button id="browseBtn" class="bg-gradient-to-r from-blue-500 to-purple-600 text-white font-medium py-3 px-8 rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-300 shadow-md hover:shadow-lg">
+                                <i class="fas fa-search mr-2"></i>Browse Files
+                            </button>
+                            <p class="text-gray-400 text-sm mt-4">Supported format: .docx (Microsoft Word)</p>
+                        </div>
+                        <input type="file" id="fileInput" class="hidden" accept=".docx,.doc">
+                    </div>
+                    
+                    <!-- File Info -->
+                    <div id="fileInfo" class="hidden bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <div class="bg-blue-100 p-3 rounded-lg mr-4">
+                                    <i class="fas fa-file-word text-blue-600 text-xl"></i>
+                                </div>
+                                <div>
+                                    <h4 id="fileName" class="font-semibold text-gray-800 truncate max-w-xs"></h4>
+                                    <p id="fileSize" class="text-gray-600 text-sm"></p>
+                                </div>
+                            </div>
+                            <button id="removeFileBtn" class="text-red-500 hover:text-red-700">
+                                <i class="fas fa-times-circle text-xl"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Conversion Settings -->
+                    <div class="mb-8">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                            <i class="fas fa-sliders-h text-purple-500 mr-2"></i>
+                            Conversion Settings
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-gray-700 text-sm font-medium mb-2">Page Size</label>
+                                <select id="pageSize" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
+                                    <option value="a4">A4</option>
+                                    <option value="letter">Letter</option>
+                                    <option value="legal">Legal</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 text-sm font-medium mb-2">Orientation</label>
+                                <select id="pageOrientation" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
+                                    <option value="portrait">Portrait</option>
+                                    <option value="landscape">Landscape</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="flex flex-col sm:flex-row gap-4">
+                        <button 
+                            id="convertBtn" 
+                            disabled
+                            class="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold py-4 px-6 rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all duration-300 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                        >
+                            <i class="fas fa-file-pdf mr-3"></i>
+                            <span>Convert to PDF</span>
+                        </button>
+                        
+                        <button 
+                            id="clearAllBtn" 
+                            disabled
+                            class="flex-1 bg-gradient-to-r from-gray-400 to-gray-500 text-white font-semibold py-4 px-6 rounded-xl hover:from-gray-500 hover:to-gray-600 transition-all duration-300 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                        >
+                            <i class="fas fa-redo mr-3"></i>
+                            <span>Clear All</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Status & Info Card -->
+                <div class="bg-white rounded-2xl shadow-xl p-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                        <i class="fas fa-info-circle text-blue-500 mr-3"></i>
+                        Conversion Status
+                    </h3>
+                    
+                    <!-- Processing Indicator -->
+                    <div id="processingIndicator" class="hidden mb-6">
+                        <div class="flex items-center justify-center bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6">
+                            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mr-4"></div>
+                            <div>
+                                <h4 class="font-semibold text-gray-800">Processing Document</h4>
+                                <p class="text-gray-600 text-sm">Converting to PDF. Please wait...</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Status Messages -->
+                    <div id="statusMessage" class="hidden mb-6 p-4 rounded-xl"></div>
+                    
+                    <!-- Conversion Info -->
+                    <div class="bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl p-5">
+                        <h4 class="font-semibold text-gray-800 mb-3 flex items-center">
+                            <i class="fas fa-lightbulb text-yellow-500 mr-2"></i>
+                            How it works
+                        </h4>
+                        <ul class="space-y-3 text-gray-600">
+                            <li class="flex items-start">
+                                <i class="fas fa-check-circle text-green-500 mt-1 mr-3"></i>
+                                <span>Upload your .docx Word document using drag & drop or file browser</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-check-circle text-green-500 mt-1 mr-3"></i>
+                                <span>Preview the document content before conversion</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-check-circle text-green-500 mt-1 mr-3"></i>
+                                <span>Adjust page size and orientation if needed</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-check-circle text-green-500 mt-1 mr-3"></i>
+                                <span>Click "Convert to PDF" to generate and download your file</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right Column: Preview -->
+            <div class="animate-fade-in" style="animation-delay: 0.1s;">
+                <div class="bg-white rounded-2xl shadow-xl p-6 h-full">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800 flex items-center">
+                            <i class="fas fa-eye text-purple-500 mr-3"></i>
+                            Document Preview
+                        </h2>
+                        <div class="flex space-x-2">
+                            <button id="togglePreviewBtn" class="bg-gradient-to-r from-gray-100 to-gray-200 text-gray-800 font-medium py-2 px-4 rounded-xl hover:from-gray-200 hover:to-gray-300 transition">
+                                <i class="fas fa-sync-alt mr-2"></i>Refresh
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Preview Content Area -->
+                    <div class="border border-gray-200 rounded-xl overflow-hidden h-[calc(100%-5rem)]">
+                        <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+                            <div class="flex items-center text-gray-700">
+                                <i class="fas fa-file-alt mr-3 text-blue-500"></i>
+                                <span id="previewTitle" class="font-semibold">Document preview will appear here</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Preview Content -->
+                        <div id="previewContent" class="preview-content p-6 bg-white h-[500px] overflow-y-auto doc-preview">
+                            <div class="flex flex-col items-center justify-center h-full text-gray-400">
+                                <div class="text-6xl mb-6">
+                                    <i class="fas fa-file-word"></i>
+                                </div>
+                                <p class="text-lg mb-2">No document loaded</p>
+                                <p class="text-center max-w-md">Upload a Word document to see a live preview of the content here.</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Preview Stats -->
+                        <div id="previewStats" class="hidden bg-gradient-to-r from-gray-50 to-blue-50 px-6 py-3 border-t border-gray-200">
+                            <div class="flex justify-between text-sm text-gray-600">
+                                <div>
+                                    <i class="fas fa-font mr-1"></i>
+                                    <span id="wordCount">0</span> words
+                                </div>
+                                <div>
+                                    <i class="fas fa-paragraph mr-1"></i>
+                                    <span id="paragraphCount">0</span> paragraphs
+                                </div>
+                                <div>
+                                    <i class="fas fa-image mr-1"></i>
+                                    <span id="imageCount">0</span> images
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Download PDF Button (only shown after conversion) -->
+                    <div id="downloadSection" class="hidden mt-6">
+                        <div class="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-5 border border-green-200">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center">
+                                    <div class="bg-green-100 p-3 rounded-lg mr-4">
+                                        <i class="fas fa-file-pdf text-green-600 text-2xl"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-bold text-gray-800">PDF Ready for Download</h4>
+                                        <p class="text-gray-600 text-sm">Your document has been successfully converted</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <button id="downloadPdfBtn" class="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold py-4 px-6 rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all duration-300 shadow-md hover:shadow-lg flex items-center justify-center">
+                                <i class="fas fa-download mr-3"></i>
+                                Download PDF File
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <!-- Footer -->
+        <footer class="mt-12 pt-8 border-t border-gray-200 text-center text-gray-600">
+            <p class="mb-2">
+                <i class="fas fa-shield-alt text-green-500 mr-2"></i>
+                Your documents are processed locally and never uploaded to any server.
+            </p>
+            <p class="text-sm">
+                Powered by <span class="font-semibold text-blue-600">mammoth.js</span> and <span class="font-semibold text-purple-600">html2pdf.js</span>
+                • All rights reserved © <span id="currentYear"></span>
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        // ============================================
+        // APPLICATION STATE AND CONFIGURATION
+        // ============================================
+        
+        // Global application state
+        const AppState = {
+            currentFile: null,
+            htmlContent: "",
+            pdfGenerated: false,
+            isProcessing: false,
+            previewStats: {
+                words: 0,
+                paragraphs: 0,
+                images: 0
+            }
+        };
+        
+        // ============================================
+        // DOM ELEMENT REFERENCES
+        // ============================================
+        
+        const fileInput = document.getElementById('fileInput');
+        const uploadZone = document.getElementById('uploadZone');
+        const browseBtn = document.getElementById('browseBtn');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const removeFileBtn = document.getElementById('removeFileBtn');
+        const convertBtn = document.getElementById('convertBtn');
+        const clearAllBtn = document.getElementById('clearAllBtn');
+        const processingIndicator = document.getElementById('processingIndicator');
+        const statusMessage = document.getElementById('statusMessage');
+        const previewContent = document.getElementById('previewContent');
+        const previewTitle = document.getElementById('previewTitle');
+        const previewStats = document.getElementById('previewStats');
+        const wordCount = document.getElementById('wordCount');
+        const paragraphCount = document.getElementById('paragraphCount');
+        const imageCount = document.getElementById('imageCount');
+        const togglePreviewBtn = document.getElementById('togglePreviewBtn');
+        const downloadSection = document.getElementById('downloadSection');
+        const downloadPdfBtn = document.getElementById('downloadPdfBtn');
+        const pageSize = document.getElementById('pageSize');
+        const pageOrientation = document.getElementById('pageOrientation');
+        const currentYear = document.getElementById('currentYear');
+        
+        // ============================================
+        // UTILITY FUNCTIONS
+        // ============================================
+        
+        /**
+         * Formats file size from bytes to human readable format
+         * @param {number} bytes - File size in bytes
+         * @returns {string} Formatted file size
+         */
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        /**
+         * Shows a status message to the user
+         * @param {string} message - The message to display
+         * @param {string} type - Type of message: 'success', 'error', 'info'
+         */
+        function showStatus(message, type = 'info') {
+            // Clear any existing status
+            statusMessage.className = '';
+            statusMessage.classList.add('p-4', 'rounded-xl');
+            
+            // Set classes based on type
+            switch(type) {
+                case 'success':
+                    statusMessage.classList.add('bg-green-100', 'border', 'border-green-200', 'text-green-800');
+                    break;
+                case 'error':
+                    statusMessage.classList.add('bg-red-100', 'border', 'border-red-200', 'text-red-800');
+                    break;
+                case 'info':
+                    statusMessage.classList.add('bg-blue-100', 'border', 'border-blue-200', 'text-blue-800');
+                    break;
+                case 'warning':
+                    statusMessage.classList.add('bg-yellow-100', 'border', 'border-yellow-200', 'text-yellow-800');
+                    break;
+            }
+            
+            // Set message content
+            statusMessage.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'} mr-3"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            // Show the message
+            statusMessage.classList.remove('hidden');
+            
+            // Auto-hide success/info messages after 5 seconds
+            if (type === 'success' || type === 'info') {
+                setTimeout(() => {
+                    statusMessage.classList.add('hidden');
+                }, 5000);
+            }
+        }
+        
+        /**
+         * Updates UI buttons based on application state
+         */
+        function updateUIState() {
+            const hasFile = AppState.currentFile !== null;
+            
+            // Enable/disable convert button
+            convertBtn.disabled = !hasFile || AppState.isProcessing;
+            
+            // Enable/disable clear button
+            clearAllBtn.disabled = !hasFile;
+            
+            // Show/hide download section
+            if (AppState.pdfGenerated) {
+                downloadSection.classList.remove('hidden');
+            } else {
+                downloadSection.classList.add('hidden');
+            }
+        }
+        
+        /**
+         * Calculates statistics from HTML content
+         * @param {string} html - HTML content to analyze
+         */
+        function calculateContentStats(html) {
+            // Create a temporary div to parse HTML
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = html;
+            
+            // Calculate word count
+            const text = tempDiv.textContent || '';
+            const words = text.trim().split(/\s+/).filter(word => word.length > 0);
+            AppState.previewStats.words = words.length;
+            
+            // Calculate paragraph count
+            const paragraphs = tempDiv.querySelectorAll('p');
+            AppState.previewStats.paragraphs = paragraphs.length;
+            
+            // Calculate image count
+            const images = tempDiv.querySelectorAll('img');
+            AppState.previewStats.images = images.length;
+            
+            // Update UI with stats
+            wordCount.textContent = AppState.previewStats.words.toLocaleString();
+            paragraphCount.textContent = AppState.previewStats.paragraphs.toLocaleString();
+            imageCount.textContent = AppState.previewStats.images.toLocaleString();
+            
+            // Show stats section if we have content
+            if (html.trim().length > 0) {
+                previewStats.classList.remove('hidden');
+            } else {
+                previewStats.classList.add('hidden');
+            }
+        }
+        
+        // ============================================
+        // FILE HANDLING FUNCTIONS
+        // ============================================
+        
+        /**
+         * Validates the uploaded file
+         * @param {File} file - The file to validate
+         * @returns {Object} Validation result with isValid boolean and message
+         */
+        function validateFile(file) {
+            // Check if file exists
+            if (!file) {
+                return { isValid: false, message: 'No file selected.' };
+            }
+            
+            // Check file type
+            const allowedTypes = [
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'application/msword'
+            ];
+            
+            const fileExtension = file.name.split('.').pop().toLowerCase();
+            
+            if (!allowedTypes.includes(file.type) && !['docx', 'doc'].includes(fileExtension)) {
+                return { 
+                    isValid: false, 
+                    message: 'Invalid file type. Please upload a .docx or .doc Word document.' 
+                };
+            }
+            
+            // Check file size (limit to 10MB)
+            const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+            if (file.size > maxSize) {
+                return { 
+                    isValid: false, 
+                    message: 'File is too large. Maximum size is 10MB.' 
+                };
+            }
+            
+            // Check for empty file
+            if (file.size === 0) {
+                return { 
+                    isValid: false, 
+                    message: 'File is empty. Please select a valid Word document.' 
+                };
+            }
+            
+            return { isValid: true, message: 'File is valid.' };
+        }
+        
+        /**
+         * Handles file selection from input or drag & drop
+         * @param {File} file - The selected file
+         */
+        async function handleFileSelection(file) {
+            // Validate the file
+            const validation = validateFile(file);
+            if (!validation.isValid) {
+                showStatus(validation.message, 'error');
+                return;
+            }
+            
+            // Store file in application state
+            AppState.currentFile = file;
+            AppState.pdfGenerated = false;
+            
+            // Update file info UI
+            fileName.textContent = file.name;
+            fileSize.textContent = formatFileSize(file.size);
+            fileInfo.classList.remove('hidden');
+            
+            // Update preview title
+            previewTitle.textContent = file.name;
+            
+            // Update UI state
+            updateUIState();
+            
+            // Show processing indicator
+            processingIndicator.classList.remove('hidden');
+            showStatus('Processing Word document...', 'info');
+            
+            try {
+                // Read file as array buffer for mammoth.js
+                const arrayBuffer = await readFileAsArrayBuffer(file);
+                
+                // Convert DOCX to HTML using mammoth.js
+                const result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
+                
+                // Store HTML content
+                AppState.htmlContent = result.value;
+                
+                // Update preview content
+                previewContent.innerHTML = AppState.htmlContent || 
+                    '<div class="text-center p-10 text-gray-500"><i class="fas fa-exclamation-triangle text-3xl mb-4"></i><p>Document converted but content is empty.</p></div>';
+                
+                // Calculate and display content statistics
+                calculateContentStats(AppState.htmlContent);
+                
+                // Show success message
+                showStatus('Document loaded successfully. Ready for conversion to PDF.', 'success');
+                
+                // Check for conversion warnings
+                if (result.messages && result.messages.length > 0) {
+                    console.warn('Conversion warnings:', result.messages);
+                    showStatus('Document loaded with some formatting warnings.', 'warning');
+                }
+                
+            } catch (error) {
+                console.error('Error processing document:', error);
+                
+                // Reset state on error
+                AppState.currentFile = null;
+                AppState.htmlContent = "";
+                
+                // Show error message based on error type
+                let errorMessage = 'Failed to process the document. ';
+                
+                if (error.message && error.message.includes('corrupt')) {
+                    errorMessage += 'The file may be corrupted or not a valid Word document.';
+                } else if (error.message && error.message.includes('password')) {
+                    errorMessage += 'Password-protected documents are not supported.';
+                } else {
+                    errorMessage += 'Please ensure it\'s a valid .docx file and try again.';
+                }
+                
+                showStatus(errorMessage, 'error');
+                
+                // Reset UI
+                fileInfo.classList.add('hidden');
+                previewContent.innerHTML = `
+                    <div class="flex flex-col items-center justify-center h-full text-gray-400">
+                        <div class="text-6xl mb-6">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <p class="text-lg mb-2 text-red-500">Error loading document</p>
+                        <p class="text-center max-w-md">${errorMessage}</p>
+                    </div>
+                `;
+                previewStats.classList.add('hidden');
+            } finally {
+                // Hide processing indicator
+                processingIndicator.classList.add('hidden');
+                updateUIState();
+            }
+        }
+        
+        /**
+         * Reads a file as ArrayBuffer (for mammoth.js)
+         * @param {File} file - File to read
+         * @returns {Promise<ArrayBuffer>} ArrayBuffer of the file
+         */
+        function readFileAsArrayBuffer(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                
+                reader.onload = (event) => {
+                    resolve(event.target.result);
+                };
+                
+                reader.onerror = (error) => {
+                    reject(new Error('Failed to read file: ' + error));
+                };
+                
+                reader.readAsArrayBuffer(file);
+            });
+        }
+        
+        /**
+         * Resets the application to initial state
+         */
+        function resetApplication() {
+            // Reset application state
+            AppState.currentFile = null;
+            AppState.htmlContent = "";
+            AppState.pdfGenerated = false;
+            AppState.previewStats = { words: 0, paragraphs: 0, images: 0 };
+            
+            // Reset UI elements
+            fileInput.value = '';
+            fileInfo.classList.add('hidden');
+            previewContent.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full text-gray-400">
+                    <div class="text-6xl mb-6">
+                        <i class="fas fa-file-word"></i>
+                    </div>
+                    <p class="text-lg mb-2">No document loaded</p>
+                    <p class="text-center max-w-md">Upload a Word document to see a live preview of the content here.</p>
+                </div>
+            `;
+            previewTitle.textContent = 'Document preview will appear here';
+            previewStats.classList.add('hidden');
+            downloadSection.classList.add('hidden');
+            statusMessage.classList.add('hidden');
+            
+            // Update UI state
+            updateUIState();
+            
+            // Show confirmation message
+            showStatus('Application reset. Ready for new document.', 'info');
+        }
+        
+        // ============================================
+        // PDF CONVERSION FUNCTIONS
+        // ============================================
+        
+        /**
+         * Converts HTML content to PDF and triggers download
+         */
+        async function convertToPdf() {
+            // Validate that we have content to convert
+            if (!AppState.currentFile || !AppState.htmlContent || AppState.htmlContent.trim().length === 0) {
+                showStatus('No document content to convert. Please upload a valid Word document first.', 'error');
+                return;
+            }
+            
+            // Set processing state
+            AppState.isProcessing = true;
+            updateUIState();
+            
+            // Show processing indicator
+            processingIndicator.classList.remove('hidden');
+            showStatus('Converting to PDF. This may take a moment...', 'info');
+            
+            try {
+                // Get conversion settings
+                const pdfPageSize = pageSize.value;
+                const pdfOrientation = pageOrientation.value;
+                
+                // Configure PDF options
+                const pdfOptions = {
+                    margin: [15, 15, 15, 15],
+                    filename: `${AppState.currentFile.name.replace(/\.[^/.]+$/, "")}.pdf`,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { 
+                        scale: 2,
+                        useCORS: true,
+                        logging: false
+                    },
+                    jsPDF: { 
+                        unit: 'mm', 
+                        format: pdfPageSize, 
+                        orientation: pdfOrientation 
+                    }
+                };
+                
+                // Create a temporary div with the content for PDF generation
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = AppState.htmlContent;
+                
+                // Add a title to the PDF
+                const titleElement = document.createElement('h1');
+                titleElement.textContent = AppState.currentFile.name.replace(/\.[^/.]+$/, "");
+                titleElement.style.textAlign = 'center';
+                titleElement.style.marginBottom = '20px';
+                titleElement.style.fontSize = '24px';
+                titleElement.style.fontWeight = 'bold';
+                tempDiv.prepend(titleElement);
+                
+                // Add conversion timestamp
+                const timestampElement = document.createElement('div');
+                timestampElement.textContent = `Converted on: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
+                timestampElement.style.textAlign = 'center';
+                timestampElement.style.marginTop = '20px';
+                timestampElement.style.fontSize = '10px';
+                timestampElement.style.color = '#666';
+                tempDiv.appendChild(timestampElement);
+                
+                // Generate PDF
+                await html2pdf().set(pdfOptions).from(tempDiv).save();
+                
+                // Update application state
+                AppState.pdfGenerated = true;
+                AppState.isProcessing = false;
+                
+                // Update UI
+                updateUIState();
+                processingIndicator.classList.add('hidden');
+                
+                // Show success message
+                showStatus('PDF generated and downloaded successfully!', 'success');
+                
+            } catch (error) {
+                console.error('Error generating PDF:', error);
+                
+                // Reset processing state
+                AppState.isProcessing = false;
+                updateUIState();
+                processingIndicator.classList.add('hidden');
+                
+                // Show error message
+                let errorMessage = 'Failed to generate PDF. ';
+                
+                if (error.message && error.message.includes('image')) {
+                    errorMessage += 'There was an issue with images in the document.';
+                } else if (error.message && error.message.includes('content')) {
+                    errorMessage += 'The document content could not be processed.';
+                } else {
+                    errorMessage += 'Please try again or check the document format.';
+                }
+                
+                showStatus(errorMessage, 'error');
+            }
+        }
+        
+        // ============================================
+        // EVENT LISTENERS
+        // ============================================
+        
+        // Browse button click event
+        browseBtn.addEventListener('click', () => {
+            fileInput.click();
+        });
+        
+        // File input change event
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                handleFileSelection(file);
+            }
+        });
+        
+        // Drag & drop events for upload zone
+        uploadZone.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+        
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+        
+        uploadZone.addEventListener('drop', (event) => {
+            event.preventDefault();
+            uploadZone.classList.remove('dragover');
+            
+            const file = event.dataTransfer.files[0];
+            if (file) {
+                handleFileSelection(file);
+            }
+        });
+        
+        // Remove file button click event
+        removeFileBtn.addEventListener('click', resetApplication);
+        
+        // Convert button click event
+        convertBtn.addEventListener('click', convertToPdf);
+        
+        // Clear all button click event
+        clearAllBtn.addEventListener('click', resetApplication);
+        
+        // Toggle preview button click event
+        togglePreviewBtn.addEventListener('click', () => {
+            if (AppState.htmlContent) {
+                // Recalculate and update stats
+                calculateContentStats(AppState.htmlContent);
+                showStatus('Preview refreshed.', 'info');
+            }
+        });
+        
+        // Download PDF button click event
+        downloadPdfBtn.addEventListener('click', convertToPdf);
+        
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+        
+        /**
+         * Initializes the application
+         */
+        function initializeApp() {
+            // Set current year in footer
+            currentYear.textContent = new Date().getFullYear();
+            
+            // Initialize UI state
+            updateUIState();
+            
+            // Show welcome message
+            setTimeout(() => {
+                showStatus('Welcome to DocConvert Pro! Upload a Word document to get started.', 'info');
+            }, 1000);
+            
+            // Log initialization
+            console.log('DocConvert Pro initialized successfully.');
+        }
+        
+        // Initialize the application when DOM is loaded
+        document.addEventListener('DOMContentLoaded', initializeApp);
+    </script>
+</body>
+</html>
